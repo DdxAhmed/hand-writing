@@ -53,4 +53,4 @@ An innovative interactive web application that allows you to draw and write in t
 3. امنح المتصفح صلاحية الوصول للكاميرا، وابدأ الإبداع!
 
 ---
-<p align="center">✨ رمضان مبارك وكل عام وأنتم بخير ✨</p>
+<p align="center">✨ عيدكم مبارك وكل عام وأنتم بخير ✨</p>
