@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hand Pen</title>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&family=Outfit:wght@300;400;600;700&display=swap');
+
+    :root {
+      --primary-color: #F5D061;
+      --primary-glow: rgba(245, 208, 97, 0.4);
+      --bg-dark: rgba(10, 6, 2, 0.85);
+      --glass-bg: rgba(20, 15, 10, 0.75);
+      --glass-border: rgba(245, 208, 97, 0.25);
+      --text-main: #F5F0E6;
+      --text-muted: #A8A090;
+      --danger-color: #FF2A54;
+      --success-color: #00F5A0;
+    }
+
+    body {
+      margin: 0;
+      background: #050301;
+      overflow: hidden;
+      font-family: 'Cairo', 'Outfit', sans-serif;
+      color: var(--text-main);
+      user-select: none;
+    }
+
+    video {
+      display: none;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      transform: scaleX(-1);
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+
+    /* UI Layer container */
+    .ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      box-sizing: border-box;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .header-panel {
+      pointer-events: auto;
+      align-self: flex-start;
+      background: var(--glass-bg);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid var(--glass-border);
+      padding: 16px 28px;
+      border-radius: 20px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      animation: fadeInDown 0.6s ease;
+      direction: rtl;
+    }
+
+    .header-logo {
+      font-size: 2.2rem;
+      filter: drop-shadow(0 0 8px var(--primary-glow));
+    }
+
+    .header-text h1 {
+      margin: 0;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--primary-color);
+      text-shadow: 0 0 10px var(--primary-glow);
+      line-height: 1.2;
+    }
+
+    .header-text p {
+      margin: 4px 0 0 0;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      font-family: 'Outfit', sans-serif;
+    }
+
+    .control-panel {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      bottom: 24px;
+      width: 360px;
+      pointer-events: auto;
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 24px;
+      padding: 24px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      gap: 22px;
+      overflow-y: auto;
+      box-sizing: border-box;
+      animation: fadeInRight 0.6s ease;
+      direction: rtl;
+    }
+
+    .control-panel::-webkit-scrollbar {
+      width: 6px;
+    }
+    .control-panel::-webkit-scrollbar-thumb {
+      background: rgba(245, 208, 97, 0.3);
+      border-radius: 10px;
+    }
+
+    .panel-section {
+      border-bottom: 1px solid rgba(245, 208, 97, 0.1);
+      padding-bottom: 18px;
+    }
+    .panel-section:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .panel-section h3 {
+      margin: 0 0 12px 0;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--primary-color);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Status indicator styles */
+    .status-container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .status-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.9rem;
+    }
+    .status-label {
+      color: var(--text-main);
+    }
+    .status-value {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .indicator-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      transition: all 0.3s ease;
+    }
+    .indicator-dot.red {
+      background: var(--danger-color);
+      box-shadow: 0 0 10px var(--danger-color);
+    }
+    .indicator-dot.green {
+      background: var(--success-color);
+      box-shadow: 0 0 10px var(--success-color);
+    }
+    .indicator-dot.blue {
+      background: #00F2FE;
+      box-shadow: 0 0 10px #00F2FE;
+    }
+    .indicator-dot.grey {
+      background: #555;
+      box-shadow: none;
+    }
+    .status-text {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+
+
+    /* Color picker & slider */
+    .settings-group {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .setting-label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .setting-label span.en {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+    .color-options {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-start;
+    }
+    .color-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .color-btn:hover {
+      transform: scale(1.15);
+    }
+    .color-btn.active {
+      border-color: #FFFFFF;
+      transform: scale(1.1);
+    }
+    
+    .slider-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-container input[type="range"] {
+      flex-grow: 1;
+      accent-color: var(--primary-color);
+      background: rgba(255,255,255,0.1);
+      height: 6px;
+      border-radius: 3px;
+      outline: none;
+      cursor: pointer;
+      width: 100%;
+    }
+    .slider-val {
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.85rem;
+      color: var(--primary-color);
+      width: 40px;
+      text-align: left;
+    }
+
+    /* Action buttons */
+    .actions-container {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .action-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 14px;
+      border: 1px solid transparent;
+      font-family: 'Cairo', sans-serif;
+      font-size: 0.95rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .action-btn.danger {
+      background: rgba(255, 42, 84, 0.15);
+      color: #FF5E7E;
+      border-color: rgba(255, 42, 84, 0.3);
+    }
+    .action-btn.danger:hover {
+      background: rgba(255, 42, 84, 0.25);
+      box-shadow: 0 0 15px rgba(255, 42, 84, 0.2);
+    }
+    .action-btn.success {
+      background: rgba(0, 245, 160, 0.15);
+      color: #33FFB5;
+      border-color: rgba(0, 245, 160, 0.3);
+    }
+    .action-btn.success:hover {
+      background: rgba(0, 245, 160, 0.25);
+      box-shadow: 0 0 15px rgba(0, 245, 160, 0.2);
+    }
+    .action-btn.toggle-off {
+      background: rgba(245, 208, 97, 0.1);
+      color: var(--primary-color);
+      border-color: rgba(245, 208, 97, 0.3);
+    }
+    .action-btn.toggle-off:hover {
+      background: rgba(245, 208, 97, 0.2);
+    }
+    .action-btn.toggle-on {
+      background: rgba(245, 208, 97, 0.45);
+      color: #FFFFFF;
+      border-color: var(--primary-color);
+      box-shadow: 0 0 15px var(--primary-glow);
+    }
+    .action-btn.toggle-on:hover {
+      background: rgba(245, 208, 97, 0.6);
+    }
+
+    /* Keyframes */
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes fadeInRight {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes pulse {
+      0% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.25); opacity: 0.7; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+    .pulse {
+      animation: pulse 1.2s infinite;
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .ui-layer {
+        padding: 16px;
+      }
+      .header-panel {
+        padding: 10px 18px;
+      }
+      .control-panel {
+        width: 320px;
+        padding: 18px;
+        gap: 16px;
+      }
+    }
+    @media (max-width: 768px) {
+      .ui-layer {
+        flex-direction: column;
+        justify-content: flex-start;
+        gap: 16px;
+      }
+      .header-panel {
+        align-self: stretch;
+        justify-content: center;
+      }
+      .control-panel {
+        position: static;
+        width: 100%;
+        max-height: 50vh;
+        align-self: stretch;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-container">
+    <video id="vid" autoplay playsinline></video>
+    <canvas id="c"></canvas>
+    
+    <!-- UI Layer -->
+    <div class="ui-layer">
+      <!-- Header -->
+      <div class="header-panel">
+
+        </div>
+      </div>
+      
+      <!-- Sidebar / Controls -->
+      <div class="control-panel">
+        <!-- System Status -->
+        <div class="panel-section">
+          <h3>📊 حالة النظام <span class="status-text">(System Status)</span></h3>
+          <div class="status-container">
+            <div class="status-item">
+              <span class="status-label">الكاميرا / Camera</span>
+              <div class="status-value" id="status-camera">
+                <span class="status-text">غير متصل</span>
+                <span class="indicator-dot red"></span>
+              </div>
+            </div>
+            <div class="status-item">
+              <span class="status-label">اليد / Hand</span>
+              <div class="status-value" id="status-hand">
+                <span class="status-text">غير مكتشفة</span>
+                <span class="indicator-dot red"></span>
+              </div>
+            </div>
+            <div class="status-item">
+              <span class="status-label">قلم الكتابة / Pen State</span>
+              <div class="status-value" id="status-draw">
+                <span class="status-text">خامل</span>
+                <span class="indicator-dot grey"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <!-- Customizations -->
+        <div class="panel-section settings-group">
+          <h3>🎨 تخصيص القلم <span class="status-text">(Pen Settings)</span></h3>
+          
+          <div>
+            <div class="setting-label">
+              <span>اختر لون الخط</span>
+              <span class="en">Choose Color</span>
+            </div>
+            <div class="color-options">
+              <button class="color-btn active" data-color="#F5D061" style="background: #F5D061; box-shadow: 0 0 10px #F5D061;"></button>
+              <button class="color-btn" data-color="#00F2FE" style="background: #00F2FE;"></button>
+              <button class="color-btn" data-color="#00F5A0" style="background: #00F5A0;"></button>
+              <button class="color-btn" data-color="#FF2A54" style="background: #FF2A54;"></button>
+              <button class="color-btn" data-color="#FFFFFF" style="background: #FFFFFF;"></button>
+            </div>
+          </div>
+
+          <div>
+            <div class="setting-label">
+              <span>حجم الخط / السمك</span>
+              <span id="brush-size-val">6px</span>
+            </div>
+            <div class="slider-container">
+              <input type="range" id="brush-size" min="3" max="25" value="6">
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div class="panel-section actions-container">
+          <button id="btn-toggle-pen" class="action-btn toggle-off">
+            ✏️ تشغيل القلم (Shift: OFF)
+          </button>
+          <button id="btn-clear" class="action-btn danger">
+            🗑️ مسح اللوحة (Space)
+          </button>
+          <button id="btn-save" class="action-btn success">
+            💾 حفظ لوحتك الفنية (Download)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    var vid = document.getElementById('vid');
+    var c = document.getElementById('c');
+    var ctx = c.getContext('2d');
+    var arr = [];
+    var cur = null;
+    var shift = false;
+    var draw = false;
+    var sx = null;
+    var sy = null;
+
+    // Custom configuration
+    var currentColor = '#F5D061';
+    var currentWidth = 6;
+    var isCameraActive = false;
+    var isHandDetected = false;
+
+    // Elements for UI updates
+    var statusCameraEl = document.getElementById('status-camera');
+    var statusHandEl = document.getElementById('status-hand');
+    var statusDrawEl = document.getElementById('status-draw');
+
+    function updatePenToggle() {
+      var btn = document.getElementById('btn-toggle-pen');
+      if (shift) {
+        btn.className = 'action-btn toggle-on';
+        btn.innerHTML = '✏️ إيقاف القلم (Shift: ON)';
+      } else {
+        btn.className = 'action-btn toggle-off';
+        btn.innerHTML = '✏️ تشغيل القلم (Shift: OFF)';
+      }
+    }
+
+    window.onkeydown = function(e) {
+      if (e.key === 'Shift' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
+        e.preventDefault();
+        shift = !shift;
+        updatePenToggle();
+      }
+      if (e.code === 'Space') {
+        e.preventDefault();
+        arr = [];
+        cur = null;
+        draw = false;
+      }
+    }
+
+    document.getElementById('btn-toggle-pen').onclick = function() {
+      shift = !shift;
+      updatePenToggle();
+    };
+
+    // Set up Settings interactivity
+    var colorBtns = document.querySelectorAll('.color-btn');
+    colorBtns.forEach(function(btn) {
+      btn.onclick = function() {
+        colorBtns.forEach(b => {
+          b.classList.remove('active');
+          b.style.boxShadow = 'none';
+        });
+        btn.classList.add('active');
+        currentColor = btn.getAttribute('data-color');
+        btn.style.boxShadow = '0 0 12px ' + currentColor;
+      };
+    });
+
+    var brushSlider = document.getElementById('brush-size');
+    var brushValDisplay = document.getElementById('brush-size-val');
+    brushSlider.oninput = function() {
+      currentWidth = parseInt(this.value);
+      brushValDisplay.innerText = currentWidth + 'px';
+    };
+
+    document.getElementById('btn-clear').onclick = function() {
+      arr = [];
+      cur = null;
+      draw = false;
+    };
+
+    document.getElementById('btn-save').onclick = function() {
+      downloadCanvas();
+    };
+
+    function downloadCanvas() {
+      var tempCanvas = document.createElement('canvas');
+      tempCanvas.width = c.width;
+      tempCanvas.height = c.height;
+      var tempCtx = tempCanvas.getContext('2d');
+      
+      // We flip horizontally because the canvas screen is mirrored visually
+      tempCtx.translate(c.width, 0);
+      tempCtx.scale(-1, 1);
+      tempCtx.drawImage(c, 0, 0);
+      
+      var link = document.createElement('a');
+      link.download = 'ramadan_painting_' + Date.now() + '.png';
+      link.href = tempCanvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function run(res) {
+      c.width = window.innerWidth;
+      c.height = window.innerHeight;
+      
+      // Clear canvas with background camera image
+      ctx.drawImage(res.image, 0, 0, c.width, c.height);
+      
+      // Apply dark cinematic overlay
+      ctx.fillStyle = 'rgba(10, 6, 2, 0.85)';
+      ctx.fillRect(0, 0, c.width, c.height);
+
+      // Draw all saved lines
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.shadowBlur = 15;
+
+      for (var i = 0; i < arr.length; i++) {
+        var stroke = arr[i];
+        if (!stroke || !stroke.points || stroke.points.length === 0) continue;
+        
+        ctx.beginPath();
+        ctx.strokeStyle = stroke.color;
+        ctx.shadowColor = stroke.color;
+        ctx.lineWidth = stroke.width;
+
+        for (var j = 0; j < stroke.points.length; j++) {
+          if (j == 0) ctx.moveTo(stroke.points[j].x, stroke.points[j].y);
+          else ctx.lineTo(stroke.points[j].x, stroke.points[j].y);
+        }
+        ctx.stroke();
+      }
+
+      // Check hand landmarks
+      if (res.multiHandLandmarks && res.multiHandLandmarks.length > 0) {
+        if (!isHandDetected) {
+          isHandDetected = true;
+          statusHandEl.querySelector('.indicator-dot').className = 'indicator-dot green';
+          statusHandEl.querySelector('.status-text').innerText = 'تم الكشف | Detected';
+        }
+
+        var lm = res.multiHandLandmarks[0];
+        drawConnectors(ctx, lm, HAND_CONNECTIONS, {color: 'rgba(245, 208, 97, 0.3)', lineWidth: 2});
+        drawLandmarks(ctx, lm, {color: '#FFFFFF', lineWidth: 1, radius: 2});
+
+        var ind = lm[8]; // Index finger tip
+        var thumb = lm[4]; // Thumb tip
+        
+        var rx = ind.x * c.width;
+        var ry = ind.y * c.height;
+
+        // Apply smooth interpolation
+        if (sx == null) {
+          sx = rx; 
+          sy = ry;
+        } else {
+          sx += (rx - sx) * 0.45;
+          sy += (ry - sy) * 0.45;
+        }
+
+        // Calculate pinch gesture distance (thumb and index close to each other)
+        var dist = Math.sqrt(
+          Math.pow(thumb.x - ind.x, 2) +
+          Math.pow(thumb.y - ind.y, 2) +
+          Math.pow(thumb.z - ind.z, 2)
+        );
+        
+        var isPinching = dist < 0.05;
+        var isDrawing = shift || isPinching;
+
+        // Draw active brush guide
+        ctx.beginPath();
+        ctx.arc(sx, sy, isDrawing ? currentWidth / 2 + 2 : 6, 0, 2 * Math.PI);
+        if (isDrawing) { 
+          ctx.fillStyle = '#FFFFFF'; 
+          ctx.shadowColor = currentColor;
+          ctx.shadowBlur = 10;
+        } else { 
+          ctx.fillStyle = 'rgba(245, 208, 97, 0.5)'; 
+          ctx.shadowBlur = 0;
+        }
+        ctx.fill();
+
+        // Manage drawing line state
+        if (isDrawing) {
+          statusDrawEl.querySelector('.indicator-dot').className = 'indicator-dot blue pulse';
+          statusDrawEl.querySelector('.status-text').innerText = 'يكتب... | Drawing';
+
+          if (!draw) {
+            draw = true;
+            cur = {
+              points: [],
+              color: currentColor,
+              width: currentWidth
+            };
+            arr.push(cur);
+          }
+          cur.points.push({x: sx, y: sy});
+        } else {
+          statusDrawEl.querySelector('.indicator-dot').className = 'indicator-dot grey';
+          statusDrawEl.querySelector('.status-text').innerText = 'خامل | Hovering';
+          draw = false;
+        }
+      } else {
+        if (isHandDetected) {
+          isHandDetected = false;
+          statusHandEl.querySelector('.indicator-dot').className = 'indicator-dot red';
+          statusHandEl.querySelector('.status-text').innerText = 'غير مكتشفة | None';
+        }
+        statusDrawEl.querySelector('.indicator-dot').className = 'indicator-dot grey';
+        statusDrawEl.querySelector('.status-text').innerText = 'خامل | Off';
+        
+        draw = false;
+        sx = null;
+      }
+    }
+
+    var h = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      }
+    });
+    
+    h.setOptions({ 
+      maxNumHands: 1, 
+      modelComplexity: 1, 
+      minDetectionConfidence: 0.5, 
+      minTrackingConfidence: 0.5 
+    });
+    
+    h.onResults(run);
+
+    var cam = new Camera(vid, {
+      onFrame: async () => { 
+        if (!isCameraActive) {
+          isCameraActive = true;
+          statusCameraEl.querySelector('.indicator-dot').className = 'indicator-dot green';
+          statusCameraEl.querySelector('.status-text').innerText = 'نشط | Active';
+        }
+        await h.send({image: vid}); 
+      },
+      width: 1280, 
+      height: 720
+    });
+    
+    cam.start();
+  </script>
+</body>
+</html>
